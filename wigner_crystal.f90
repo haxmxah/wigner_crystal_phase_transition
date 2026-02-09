@@ -1,232 +1,41 @@
-module config
-    use iso_fortran_env, only: dp => real64
-    implicit none
-
-    ! Parameters
-    integer, parameter :: N = 64
-    
-    real(dp), parameter :: density = 1.0_dp
-    real(dp), parameter :: q = 1.0_dp
-    
-    ! Mathematical constants
-    real(dp), parameter :: PI = 4.0_dp * atan(1.0_dp)
-
-contains
-
-    ! Uniform Random generator [min, max]
-    function random_uniform(min_val, max_val) result(r)
-        real(dp), intent(in) :: min_val, max_val
-        real(dp) :: r, u
-        call random_number(u)
-        r = min_val + (max_val - min_val) * u
-    end function random_uniform
-
-    ! Reads external input files that follow the structure of
-    ! input_parameters.in
-    subroutine read_input(input_file)
-        implicit none
-
-        character(*), intent(in) :: input_file
-
-        integer :: ios, input_file_unit
-
-        open(newunit = input_file_unit, file = input_file, &
-                status = 'old', action = 'read', iostat = ios)
-
-        if (ios /= 0) then
-            print *, 'Error reading input file ', input_file
-            stop
-        end if
-
-        !
-        ! Read input file contents,
-        !
-        ! Make sure these are in the same order that the ones defined in
-        ! the input file.
-        ! In case you wish to add an extra variable to be read from the
-        ! input file, it should also be added here below.
-        !
-        read(unit = input_file_unit, fmt = *) N
-        read(unit = input_file_unit, fmt = *) density
-        read(unit = input_file_unit, fmt = *) q
-        read(unit = input_file_unit, fmt = *) mc_steps
-        read(unit = input_file_unit, fmt = *) pre_mc_steps
-        read(unit = input_file_unit, fmt = *) freeze_mc_steps
-        read(unit = input_file_unit, fmt = *) frame_step
-        read(unit = input_file_unit, fmt = *) T_i
-        read(unit = input_file_unit, fmt = *) T_f
-        read(unit = input_file_unit, fmt = *) T_step
-
-        close(unit = input_file_unit)
-    end subroutine read_input
-
-end module config
-
-module physics
-    use config
-    implicit none
-
-contains
-
-    ! Applies PBC to a vector
-    pure function apply_pbc(r, L) result(r_pbc)
-        real(dp), intent(in) :: r(3)
-        real(dp), intent(in) :: L
-        real(dp) :: r_pbc(3)
-        
-        r_pbc = r - L * dnint(r / L)
-    end function apply_pbc
-
-    ! PBC euclidean distance
-    pure function get_pbc_dist(r1, r2, L) result(dist)
-        real(dp), intent(in) :: r1(3), r2(3)
-        real(dp), intent(in) :: L
-        real(dp) :: dist, dr(3)
-
-        dr = apply_pbc(r1 - r2, L)
-        dist = sqrt(dot_product(dr, dr))
-    end function get_pbc_dist
-
-    ! Coulomb total potential
-    function get_total_potential(positions, L) result(V)
-        real(dp), intent(in) :: positions(3, N)
-        real(dp), intent(in) :: L
-        real(dp) :: V, r
-        integer :: i, j
-
-        V = 0.0_dp
-        do i = 1, N-1
-            do j = i+1, N
-                r = get_pbc_dist(positions(:, i), positions(:, j), L)
-                if (r > 1.0e-12_dp) then ! Evitar división por cero
-                    V = V + (q * q) / r
-                endif
-            end do
-        end do
-    end function get_total_potential
-
-    ! Coulomb potential for a single particle
-    function get_single_particle_potential(pid, pos_vec, all_positions, L) result(V)
-        integer, intent(in) :: pid          ! particle id
-        real(dp), intent(in) :: pos_vec(3)  ! position of pid
-        real(dp), intent(in) :: all_positions(3, N)
-        real(dp), intent(in) :: L
-        real(dp) :: V, r
-        integer :: i
-
-        V = 0.0_dp
-        do i = 1, N
-            if (i /= pid) then
-                r = get_pbc_dist(pos_vec, all_positions(:, i), L)
-                if (r > 1.0e-12_dp) then
-                    V = V + (q * q) / r
-                endif
-            end if
-        end do
-    end function get_single_particle_potential
-
-end module physics
-
-module montecarlo
-    use physics
-    use config
-
-contains
-
-    subroutine montecarlo_step(L, T, dr, positions, total_energy, accepted_moves)
-        implicit none
-        real(dp), intent(in) :: L, T, dr
-        real(dp), intent(inout) :: positions(3, N)
-        real(dp), intent(inout) :: total_energy
-        integer, intent(inout) :: accepted_moves
-
-        real(dp) :: rnd_val, dE, current_E_part, new_E_part
-        real(dp) :: rvec(3), old_pos_vec(3), new_pos_vec(3)
-        integer :: particle_id
-        logical :: move_accepted
-        
-        move_accepted = .false.
-
-        ! Pick a particle randomly
-        call random_number(rnd_val)
-        particle_id = floor(rnd_val * N) + 1
-        if (particle_id > N) particle_id = N 
-
-        ! Generate a random displacement 
-        call random_number(rvec) ! rvec en [0,1]
-        rvec = (2.0_dp * rvec - 1.0_dp) * dr ! rvec en [-dr, dr]
-
-        ! Propose new position applying pbc
-        old_pos_vec = positions(:, particle_id)
-        new_pos_vec = apply_pbc(old_pos_vec + rvec, L)
-
-        ! Compute the energy difference due to that particle
-        current_E_part = get_single_particle_potential(particle_id, old_pos_vec, positions, L)
-        new_E_part     = get_single_particle_potential(particle_id, new_pos_vec, positions, L)
-        
-        dE = new_E_part - current_E_part
-
-        ! Metropolis algorithm
-        if (dE < 0.0_dp) then
-            ! Accept
-            move_accepted = .true.
-        else
-            call random_number(rnd_val)
-            if (rnd_val < exp(-dE / T)) then
-                ! Accept
-                move_accepted = .true.
-            end if
-        end if
-
-        if (move_accepted) then
-            ! Update position and total energy
-            positions(:, particle_id) = new_pos_vec
-            total_energy = total_energy + dE
-            accepted_moves = accepted_moves + 1
-        end if
-
-    end subroutine montecarlo_step
-
-end module montecarlo
-
 program annealing
     use config
     use physics
     use montecarlo
+    use io
 
     implicit none
 
     ! Simulation variables
     real(dp) :: L
-    real(dp), allocatable :: positions(:,:) ! Shape (3, N)
-    real(dp) :: total_energy
-    real(dp) :: T, T_i, T_f, T_step, C, C0, alpha, dr
+    real(dp) :: total_energy, best_energy
+    real(dp) :: T, C, C0, dr
     real(dp) :: acceptance_ratio
     real(dp) :: boltzmann_factor
     real(dp) :: old_pos_vec(3), new_pos_vec(3)
-    
-    integer :: mc_steps, warm_up_steps, step, i, particle_id
-    integer :: num_temps, t_idx, positions_unit, energy_unit
+    real(dp), allocatable :: positions(:, :), best_positions(:, :) ! Shape (3, N)
+    real(dp) :: sum_E, sum_E_sq, avg_E, heat_cap, E_current, gamma
+
+    integer :: mc_steps, warm_up_steps, freeze_mc_steps, step, best_step, i, particle_id
+    integer :: num_temps, t_idx, positions_unit, energy_unit, heat_capacity_unit
     integer :: accepted_moves
 
-    ! Parameter inicialization
+    call read_input('input_parameters.in')
+
+    ! Parameter initialization
     L = (real(N, dp) / density)**(1.0_dp/3.0_dp)
-    
+
     mc_steps = 100 * N**2
     warm_up_steps = int(0.1_dp * mc_steps)
-    
-    T_i = 1.0_dp
-    T_f = 0.001_dp
-    T_step = 0.99_dp
-    
+    freeze_mc_steps = int(freeze_mc_steps_scale*mc_steps)
+
     C0 = 0.8_dp * L
-    alpha = 0.5_dp
 
     ! Number of temperature steps
     num_temps = nint(log(T_f / T_i) / log(T_step)) + 1
 
-    allocate(positions(3, N))
-    call random_seed() 
+    allocate(positions(3, N), best_positions(3, N))
+    call random_seed()
 
     ! Random initialization of the particles
     do i = 1, N
@@ -237,6 +46,7 @@ program annealing
 
     ! Initial energy
     total_energy = get_total_potential(positions, L)
+    best_energy = total_energy
 
     print *, "========================================="
     print *, " Simulation Parameters"
@@ -244,21 +54,20 @@ program annealing
     print *, " L =", L
     print *, " MC Steps per T =", mc_steps
     print *, "========================================="
-    
+
     ! Create output file to save results
-    
-    ! Energy unit
     open (newunit = energy_unit, file = 'energy.out', action = 'write', status = 'replace')
-    
+    open (newunit = heat_capacity_unit, file = 'heat_capacity.out', action = 'write', status = 'replace')
 
     ! Loop temperature (annealing)
     T = T_i
     do t_idx = 1, num_temps
-        
         accepted_moves = 0
         C = C0 * (T / T_i)**alpha
         dr = C * sqrt(T)
-        
+        sum_E = 0.0_dp
+        sum_E_sq = 0.0_dp
+
         print '(A, F10.5, A, F10.5)', " * Temperature =", T, " | C =", C
 
         ! Warm up MC ---------------------------------------------------------------------------------------------------
@@ -269,34 +78,62 @@ program annealing
         ! Loop MC ---------------------------------------------------------------------------------------------------
         accepted_moves = 0
         do step = 1, mc_steps
-            
+
             call montecarlo_step(L, T, dr, positions, total_energy, accepted_moves)
-            
+
             if ( mod(step, 100) == 0 ) then
                 write(unit = energy_unit, fmt = *) step, total_energy, T
+                
+                ! Accumulate sums for averages        
+                sum_E = sum_E + total_energy
+                sum_E_sq = sum_E_sq + (total_energy**2)
             end if
+
 
         end do
 
+        avg_E = sum_E / real(mc_steps, dp)
+        heat_cap = ( (sum_E_sq / real(mc_steps, dp)) - (avg_E**2) ) / (T**2)
+        gamma = (4.0_dp/3.0_dp * pi * density)**(1.0_dp / 3.0_dp)/T
+        write(unit = heat_capacity_unit, fmt = *) T, avg_E, heat_cap, gamma
+
         acceptance_ratio = real(accepted_moves, dp) / real(mc_steps, dp)
-        
+
         print '(A, E14.6)', "   -> Final Energy: ", total_energy
         print '(A, F10.4)', "   -> Accept Ratio: ", acceptance_ratio
-        print * 
+        print *
         T = T * T_step ! Update temperature
-
     end do
 
     close(unit  = energy_unit)
+    close(unit  = heat_capacity_unit)
 
+    ! Freeze MC steps ---------------------------------------------------------------------------------------------------    
+    open (newunit = positions_unit, file = 'positions_t0.xyz', action = 'write', status = 'replace')
+    do step = 1, freeze_mc_steps
+        call montecarlo_step(L, T, dr, positions, total_energy, accepted_moves)
+        write(unit = positions_unit, fmt = '(i0)') N
+        write(unit = positions_unit, fmt = '(i0)') step
+        do i = 1, N
+            write(unit = positions_unit, fmt = *) 'A', positions(:, i)
+        end do
 
-    open (newunit = positions_unit, file = 'positions.xyz', action = 'write', status = 'replace')
-    write(unit = positions_unit, fmt = '(i0/)') N
-    do i = 1, N
-        write(unit = positions_unit, fmt = *) 'A', positions(:, i)
+        ! Saves the energy, step and particle positions for the minimum energy configuration.
+        if (total_energy < best_energy) then
+            best_energy = total_energy
+            best_positions(:, :) = positions(:, :)
+            best_step = step
+        end if
     end do
     close(unit  = positions_unit)
-    
+
+    open (newunit = positions_unit, file = 'final_position.xyz', action = 'write', status = 'replace')
+    write(unit = positions_unit, fmt = '(i0)') N
+    write(unit = positions_unit, fmt = '(i0)') best_step
+    do i = 1, N
+        write(unit = positions_unit, fmt = *) 'A', best_positions(:, i)
+    end do
+    close(unit  = positions_unit)
 
     deallocate(positions)
 
