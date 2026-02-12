@@ -23,17 +23,21 @@ set -e
 # Sweep parameters
 # -----------------------------------------------------------------------------
 
-N_LIST="16 32 64"
+N_LIST="64 125"
+
+# SC n³: 64, 125, 216, 343...
+# BCC 2n³: 54, 128, 250, 434...
+# FCC 4n³: 108, 256, 500, 864...
 
 # Density loop.
 initial_density=0.1
 final_density=2.0
 density_step=0.1
-DENSITY_LIST="$(seq $initial_density $density_step $final_density)"
+DENSITY_LIST=$(LC_NUMERIC=C awk "BEGIN{for(d=$initial_density; d<=$final_density+1e-9; d+=$density_step) printf \"%.2f \", d}")
 
 # Physical / algorithmic parameters
 FREEZE_MC_STEPS_SCALE=0.5
-ALPHA=1.0
+ALPHA=0.5
 CHARGE=1.0
 
 T_INITIAL=1.0
@@ -47,12 +51,14 @@ mkdir -p "$BASE_OUTDIR"
 #
 # Loop over N and Density
 #
-for DENSITY in $DENSITY_LIST; do
-    for N in $N_LIST; do
+for N in $N_LIST; do
+    for DENSITY in $DENSITY_LIST; do
         RUN_NAME="n${N}_density${DENSITY}_t${T_INITIAL}-${T_FINAL}-${T_STEP}"
         OUTDIR="${BASE_OUTDIR}/${RUN_NAME}"
 
         mkdir -p "$OUTDIR"
+
+        L=$(LC_NUMERIC=C awk "BEGIN { print ($N / $DENSITY)^(1/3) }")
 
         cat << _header_
 -------------------------------------------------------------------------------
@@ -73,10 +79,11 @@ $CHARGE                 ! Particle charge
 $T_INITIAL              ! Initial temperature
 $T_FINAL                ! Final temperature
 $T_STEP                 ! Temperature step
+$L                      ! Box size
 EOF
 
         # Run simulation
-        ./wigner_crystal | tee -a "$OUTDIR/run.log"
+        ./mc_annealing_wigner_crystal | tee -a "$OUTDIR/run.log"
 
         #
         # Collect outputs
