@@ -1,8 +1,9 @@
-128
-0.5
-0.5
-0.1
-1.0
-1.0
-0.0001
-0.98
+125                      ! Number of particles
+0.5  ! Freeze MC steps
+0.5                  ! Parameter alpha
+0.10                ! Density
+1.0                 ! Particle charge
+1.0              ! Initial temperature
+0.0001                ! Final temperature
+0.99                 ! Temperature step
+8.61774                      ! Box size
