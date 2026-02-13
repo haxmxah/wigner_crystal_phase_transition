@@ -20,6 +20,7 @@ program annealing
     integer :: mc_steps, warm_up_steps, freeze_mc_steps, step, best_step, i, particle_id
     integer :: num_temps, t_idx, positions_unit, energy_unit, heat_capacity_unit
     integer :: accepted_moves, num_samples
+    logical :: melting
 
     call read_input('input_parameters.in')
 
@@ -38,12 +39,25 @@ program annealing
     allocate(positions(3, N), best_positions(3, N))
     call random_seed()
 
-    ! Random initialization of the particles
-    do i = 1, N
-        positions(1, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-        positions(2, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-        positions(3, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-    end do
+    ! ! Random initialization of the particles
+    ! do i = 1, N
+    !     positions(1, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+    !     positions(2, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+    !     positions(3, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+    ! end do
+
+    call init_bcc_lattice(positions, N, L)
+
+    ! print *, "Guardando estado inicial en check_bcc.xyz..."
+    
+    ! open(newunit=positions_unit, file='check_bcc.xyz', status='replace', action='write')
+    ! write(positions_unit, '(I0)') N
+    ! write(positions_unit, *) 'Comprobacion Estructura BCC'
+    ! do i = 1, N
+    !     ! Escribimos 'H' o 'A' como átomo dummy para visualización
+    !     write(positions_unit, *) 'A', positions(1, i), positions(2, i), positions(3, i)
+    ! end do
+    ! close(positions_unit)
 
     ! Initial energy
     total_energy = get_total_potential(positions, L)
@@ -66,6 +80,7 @@ program annealing
         accepted_moves = 0
         C = C0 * (T / T_i)**alpha
         dr = C * sqrt(T)
+        
         sum_E = 0.0_dp
         sum_E_sq = 0.0_dp
 
@@ -93,12 +108,11 @@ program annealing
                 
             end if
 
-
         end do
 
         avg_E = sum_E / real(num_samples, dp)
         heat_cap = ( (sum_E_sq / real(num_samples, dp)) - (avg_E**2) ) / (T**2)
-        gamma = (4.0_dp/3.0_dp * pi * density)**(1.0_dp / 3.0_dp)/T
+        gamma = (q**2) * ( (4.0_dp/3.0_dp * pi * density)**(1.0_dp / 3.0_dp) ) / T
         acceptance_ratio = real(accepted_moves, dp) / real(mc_steps, dp)
 
         write(unit = heat_capacity_unit, fmt = *) T, avg_E, heat_cap, gamma, acceptance_ratio
