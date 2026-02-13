@@ -60,4 +60,37 @@ contains
             end if
         end do
     end function get_single_particle_potential
+
+    subroutine init_bcc_lattice(positions, N, L)
+        use iso_fortran_env, only: dp => real64
+        implicit none
+        real(dp), intent(out) :: positions(3, N)
+        integer, intent(in) :: N
+        real(dp), intent(in) :: L
+        integer :: n_cells, ix, iy, iz, idx
+        real(dp) :: a, offset
+
+        ! Check for N=128 (4x4x4 BCC)
+        n_cells = nint((real(N, dp)/2.0_dp)**(1.0_dp/3.0_dp))
+        a = L / real(n_cells, dp)
+        offset = -L / 2.0_dp
+        idx = 1
+
+        do ix = 0, n_cells - 1
+            do iy = 0, n_cells - 1
+                do iz = 0, n_cells - 1
+                    ! Corner Atom
+                    positions(1, idx) = offset + ix*a
+                    positions(2, idx) = offset + iy*a
+                    positions(3, idx) = offset + iz*a
+                    idx = idx + 1
+                    ! Body Center Atom
+                    positions(1, idx) = offset + (ix + 0.5_dp)*a
+                    positions(2, idx) = offset + (iy + 0.5_dp)*a
+                    positions(3, idx) = offset + (iz + 0.5_dp)*a
+                    idx = idx + 1
+                end do
+            end do
+        end do
+    end subroutine init_bcc_lattice
 end module physics
