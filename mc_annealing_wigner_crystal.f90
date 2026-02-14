@@ -4,34 +4,32 @@ program annealing
     use montecarlo
     use io
     use radial_distribution_function
+    use cooling
 
     implicit none
 
     ! Simulation variables
     real(dp) :: L
     real(dp) :: total_energy, best_energy
-    real(dp) :: T, C, C0, dr
+    real(dp) :: T, C, dr
     real(dp) :: acceptance_ratio
-    real(dp) :: boltzmann_factor
-    real(dp) :: old_pos_vec(3), new_pos_vec(3)
-    real(dp), allocatable :: positions(:, :), best_positions(:, :), x(:, :), y(:, :), z(:, :), time_points(:) ! Shape (3, N)
-    real(dp) :: sum_E, sum_E_sq, avg_E, heat_cap, E_current, gamma
+    real(dp), allocatable :: positions(:, :), best_positions(:, :), x(:, :), y(:, :), z(:, :), time_points(:), temperatures(:) ! Shape (3, N)
+    real(dp) :: sum_E, sum_E_sq, avg_E, heat_cap, gamma
 
-    integer :: mc_steps, warm_up_steps, freeze_mc_steps, step, best_step, i, particle_id
+    integer :: mc_steps, warm_up_steps, freeze_mc_steps, step, best_step, i
     integer :: num_temps, t_idx, positions_unit, energy_unit, heat_capacity_unit
     integer :: accepted_moves, num_samples
-    logical :: melting
+
+    character(len=256) :: cooling_method
 
     call read_input('input_parameters.in')
 
     ! Parameter initialization
     L = (real(N, dp) / density)**(1.0_dp/3.0_dp)
 
-    mc_steps = 100 * N**2
+    mc_steps = 5 * N**2
     warm_up_steps = int(0.1_dp * mc_steps)
     freeze_mc_steps = int(freeze_mc_steps_scale*mc_steps)
-
-    C0 = 0.8_dp * L
 
     ! Number of temperature steps
     num_temps = nint(log(T_f / T_i) / log(T_step)) + 1
@@ -39,34 +37,37 @@ program annealing
     allocate(positions(3, N), best_positions(3, N))
     call random_seed()
 
-    ! ! Random initialization of the particles
-    ! do i = 1, N
-    !     positions(1, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-    !     positions(2, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-    !     positions(3, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
-    ! end do
+    if (melting == 1) then
+        best_energy = HUGE(1.0D0) 
+        print *, input_positions_file, N
+        call read_positions_xyz(input_positions_file, positions, N)
+        cooling_method = "linear"
+    else
+        ! Random initialization of the particles
+        do i = 1, N
+            positions(1, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+            positions(2, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+            positions(3, i) = random_uniform(-L/2.0_dp, L/2.0_dp)
+        end do
+        ! call init_bcc_lattice(positions, N, L) only works for N = 128
 
-    call init_bcc_lattice(positions, N, L)
+        ! Initial energy
+        total_energy = get_total_potential(positions, L)
+        best_energy = total_energy
+        cooling_method = "annealing"
+    END IF
 
-    ! print *, "Guardando estado inicial en check_bcc.xyz..."
+    print *, cooling_method
+    call get_temperatures_list(temperatures, cooling_method)
     
-    ! open(newunit=positions_unit, file='check_bcc.xyz', status='replace', action='write')
-    ! write(positions_unit, '(I0)') N
-    ! write(positions_unit, *) 'Comprobacion Estructura BCC'
-    ! do i = 1, N
-    !     ! Escribimos 'H' o 'A' como átomo dummy para visualización
-    !     write(positions_unit, *) 'A', positions(1, i), positions(2, i), positions(3, i)
-    ! end do
-    ! close(positions_unit)
-
-    ! Initial energy
-    total_energy = get_total_potential(positions, L)
-    best_energy = total_energy
 
     print *, "========================================="
     print *, " Simulation Parameters"
     print *, " N =", N
     print *, " L =", L
+    print *, " rho =", density
+    print *, " Melting =", melting
+    print *, " Cooling method = ", cooling_method
     print *, " MC Steps per T =", mc_steps
     print *, "========================================="
 
@@ -75,8 +76,9 @@ program annealing
     open (newunit = heat_capacity_unit, file = 'heat_capacity.out', action = 'write', status = 'replace')
 
     ! Loop temperature (annealing)
-    T = T_i
-    do t_idx = 1, num_temps
+    do t_idx = 1, size(temperatures)
+        T = temperatures(t_idx)
+
         accepted_moves = 0
         C = C0 * (T / T_i)**alpha
         dr = C * sqrt(T)
@@ -117,11 +119,10 @@ program annealing
 
         write(unit = heat_capacity_unit, fmt = *) T, avg_E, heat_cap, gamma, acceptance_ratio
 
-
         print '(A, E14.6)', "   -> Final Energy: ", total_energy
         print '(A, F10.4)', "   -> Accept Ratio: ", acceptance_ratio
         print *
-        T = T * T_step ! Update temperature
+
     end do
 
     close(unit  = energy_unit)
