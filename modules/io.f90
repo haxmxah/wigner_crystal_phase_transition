@@ -29,9 +29,12 @@ module io
             ! In case you wish to add an extra variable to be read from the
             ! input file, it should also be added here below.
             !
+            read(unit = input_file_unit, fmt = *) melting
+            read(unit = input_file_unit, fmt = *) input_positions_file
             read(unit = input_file_unit, fmt = *) N
             read(unit = input_file_unit, fmt = *) freeze_mc_steps_scale
             read(unit = input_file_unit, fmt = *) alpha
+            read(unit = input_file_unit, fmt = *) C0
             read(unit = input_file_unit, fmt = *) density
             read(unit = input_file_unit, fmt = *) q
             read(unit = input_file_unit, fmt = *) T_i
