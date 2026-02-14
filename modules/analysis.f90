@@ -58,7 +58,7 @@ module radial_distribution_function
                 dy, dz, dv, r_lo, r_hi, const, nid
 
             ! Parameters
-            maximum_radius = L 
+            maximum_radius = L/2.0_dp
             bins = int(maximum_radius / dr)
 
             ! Allocate arrays
@@ -98,14 +98,29 @@ module radial_distribution_function
             end do
 
             ! Normalize RDF
+            ! const = 4.0_dp*pi/3.0_dp
+            ! do k = 1, bins
+            !     r_lo = (k - 1) * dr
+            !     r_hi = r_lo + dr
+            !     dv = const * (r_hi**3 - r_lo**3)  ! Shell volume
+            !     nid = density * dv
+            !     rdf(k) = h(k) / (N * freeze_mc_steps * nid)
+            !     r_values(k) = (k - 0.5_dp) * dr  ! Bin center
+            ! end do
             const = 4.0_dp*pi/3.0_dp
+
             do k = 1, bins
                 r_lo = (k - 1) * dr
                 r_hi = r_lo + dr
-                dv = const * (r_hi**3 - r_lo**3)  ! Shell volume
-                nid = density * dv
-                rdf(k) = h(k) / (N * freeze_mc_steps * nid)
-                r_values(k) = (k - 0.5_dp) * dr  ! Bin center
+                dv = const * (r_hi**3 - r_lo**3)
+                
+                ! USA LA DENSIDAD REAL:
+                nid = real(N, dp) / (L**3)  * dv  
+                
+                ! Asegura que N y steps se traten como reales en la división
+                rdf(k) = h(k) / (real(N, dp) * real(freeze_mc_steps, dp) * nid)
+                
+                r_values(k) = (k - 0.5_dp) * dr
             end do
 
             ! Save RDF results to file
