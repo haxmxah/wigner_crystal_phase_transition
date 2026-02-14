@@ -2,9 +2,10 @@ module config
     use iso_fortran_env, only: dp => real64
     implicit none
 
-    integer :: N
-    real(dp) :: T_i, T_f, T_step, alpha, density, q, freeze_mc_steps_scale
-
+    integer :: N, melting
+    character(len=256) :: input_positions_file
+    real(dp) :: T_i, T_f, T_step, alpha, C0, density, q, freeze_mc_steps_scale
+    
     ! Mathematical constants
     real(dp), parameter :: pi = 4.0_dp * atan(1.0_dp)
 
