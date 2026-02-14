@@ -9,7 +9,8 @@ PROG = mc_annealing_wigner_crystal
 SRC = ${PROG:=.f90}
 MOD = ${MODDIR}/config.f90 ${MODDIR}/montecarlo.f90 \
 	  ${MODDIR}/physics.f90 ${MODDIR}/io.f90 \
-	  ${MODDIR}/analysis.f90
+	  ${MODDIR}/analysis.f90 \
+	  ${MODDIR}/cooling.f90
 OBJ = ${MOD:.f90=.o} ${SRC:.f90=.o}
 ANC = ${OBJ:.o=.anc}
 
@@ -36,6 +37,8 @@ ${MODDIR}/montecarlo.anc: ${MODDIR}/config.anc ${MODDIR}/physics.anc \
 ${MODDIR}/physics.anc: ${MODDIR}/config.anc ${MODDIR}/physics.mod
 ${MODDIR}/io.anc: ${MODDIR}/config.anc ${MODDIR}/io.mod
 ${MODDIR}/analysis.anc: ${MODDIR}/config.anc ${MODDIR}/analysis.mod
+${MODDIR}/cooling.anc: ${MODDIR}/config.anc ${MODDIR}/cooling.mod
+
 ${PROG:=.anc}: ${MOD:.f90=.anc}
 
 ${MODDIR}/config.mod:
@@ -43,6 +46,7 @@ ${MODDIR}/montecarlo.mod:
 ${MODDIR}/physics.mod:
 ${MODDIR}/io.mod:
 ${MODDIR}/analysis.mod:
+${MODDIR}/cooling.mod:
 
 clean:
 	rm -f ${PROG} ${OBJ} ${OBJ:.o=.mod} ${ANC} *.o
