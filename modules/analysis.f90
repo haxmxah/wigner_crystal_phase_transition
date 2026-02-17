@@ -89,8 +89,6 @@ module radial_distribution_function
                             ! Boundary check to prevent out-of-bounds access
                             if (bin_index >= 1 .and. bin_index <= bins) then
                                 h(bin_index) = h(bin_index) + 2  ! pairwise counting
-                            else
-                                print *, 'Warning: bin_index out of range:', bin_index, ' (max bins:', bins, ')'
                             endif
                         endif
                     end do

@@ -12,16 +12,23 @@ from scipy.optimize import curve_fit
 # Visualization
 import matplotlib.pyplot as plt
 import plotly.express as px
-
+from matplotlib.ticker import LogLocator
 # Utils
 import warnings
 
 # Export engines
 import kaleido
+from matplotlib.ticker import MaxNLocator
 
-from plot_style import set_plot_style
+# from plot_style import set_plot_style
 
-set_plot_style()
+# set_plot_style()
+
+plt.style.use('science.mplstyle')
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "STIXGeneral"
+})
 
 
 def get_simulation_parameters(filepath):
@@ -326,11 +333,16 @@ def get_phase_transition_diagram(output_dir):
     for folder in sorted(output_dir.iterdir()):
         if folder.is_dir():
 
-            file = folder / "simulation_results.csv"
+            file1 = folder / "simulation_results.csv"
+            file2 = folder / "result_simulation.csv"
 
-            if not file.exists():
+            if file1.exists():
+                file = file1
+            elif file2.exists():
+                file = file2
+            else:
                 missing += 1
-                warnings.warn(f"No simulation_results.csv found in: {folder}")
+                warnings.warn(f"No CSV found in: {folder}")
                 continue
 
             df = pd.read_csv(file)
@@ -344,8 +356,9 @@ def get_phase_transition_diagram(output_dir):
             data.append((density, Tc))
     
     df = pd.DataFrame(data, columns=["density", "Tc"])
-    df = df.sort_values("Tc")
+    df = df.sort_values("density")
 
+    print(df)
 
     # Fit 
     fit_func = lambda Tc, k: k * (Tc**3)
@@ -364,54 +377,62 @@ def get_phase_transition_diagram(output_dir):
 
     plt.plot(Tc_vals, rho_theoretical, "--", color='black', lw=1, 
             label=rf"$\rho = {k:.2f} T_c^3$")
-    plt.plot(df["Tc"], df["density"], "o", color='blue', markersize=6, 
+    plt.plot(df["Tc"], df["density"], "o", markersize=4, 
             label="MC Simulation")
 
-    plt.text(df["Tc"].min() + 0.05, df["density"].min() + 0.05, "Gas", 
+    plt.text(df["Tc"].min() + 0.9, df["density"].min()+0.001, "Gas", 
             fontsize=12, color='darkgreen')
-    plt.text(df["Tc"].max() - 0.03, df["density"].max() - 0.5, "Coulomb Crystal", 
+    plt.text(df["Tc"].max() - 0.5, df["density"].max() - 800, "Coulomb Crystal", 
             fontsize=12, color='darkred', horizontalalignment='right')
 
+    ymin = df["density"].min()
+    ymax = df["density"].max()
+
+    plt.ylim(ymin, ymax)
+
+    plt.gca().yaxis.set_major_locator(MaxNLocator(nbins=6))
     plt.xlabel("$T_c$")
     plt.ylabel(r"$\rho$")
     plt.legend(frameon=False, loc='upper center', bbox_to_anchor=(0.5, -0.20),
            ncol=2) 
 
-    plt.grid(True)
+    # plt.grid(True)
+    plt.yscale('log')
     plt.tight_layout()
     plt.savefig( output_dir / 'phase_transition_diagram.pdf', bbox_inches='tight')
     
     print(f"Phase diagram generated. K = {k:.2f}")
 
+    
     return
 
 if '__main__':
     
-    output_dir = Path("output_n64")
+    output_dir = Path("output_n216")
 
-    for simulation_path in sorted(output_dir.iterdir()):
-        if not simulation_path.is_dir():
-            continue
+    # for simulation_path in sorted(output_dir.iterdir()):
+    #     if not simulation_path.is_dir():
+    #         continue
 
-        try:
-            print(f"\nProcessing: {simulation_path}")
+    #     try:
+    #         print(f"\nProcessing: {simulation_path}")
 
-            input_parameters_file = simulation_path / "input_parameters.in"
-            filename = simulation_path / "final_position.xyz"
-            saved_filename = simulation_path / "positions"
+    #         input_parameters_file = simulation_path / "input_parameters.in"
+    #         filename = simulation_path / "final_position.xyz"
+    #         saved_filename = simulation_path / "positions"
 
-            if not input_parameters_file.exists():
-                warnings.warn(f"Missing input_parameters.in in {simulation_path}")
-                continue
+    #         if not input_parameters_file.exists():
+    #             warnings.warn(f"Missing input_parameters.in in {simulation_path}")
+    #             continue
 
-            parameters = get_simulation_parameters(input_parameters_file)
+    #         parameters = get_simulation_parameters(input_parameters_file)
 
-            get_simulation_energy_evolution(simulation_path)
-            get_energy_cv_gamma_evolution_vs_temperature(simulation_path, parameters)
-            get_positions_plot(filename, saved_filename)
-            get_gdr(simulation_path, parameters)
+    #         get_simulation_energy_evolution(simulation_path)
+    #         get_energy_cv_gamma_evolution_vs_temperature(simulation_path, parameters)
+    #         get_positions_plot(filename, saved_filename)
+    #         get_gdr(simulation_path, parameters)
 
-        except Exception as e:
-            warnings.warn(f"Error processing {simulation_path}: {e}")
+    #     except Exception as e:
+    #         warnings.warn(f"Error processing {simulation_path}: {e}")
 
     get_phase_transition_diagram(output_dir)
