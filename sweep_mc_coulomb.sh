@@ -18,27 +18,54 @@ N_LIST="216"
 # FCC 4n³: 108, 256, 500, 864...
 
 # Density loop.
-initial_density=1.0
-final_density=1.0
-density_step=0.1
-DENSITY_LIST=$(LC_NUMERIC=C awk "BEGIN{for(d=$initial_density; d<=$final_density+1e-9; d+=$density_step) printf \"%.2f \", d}")
+# initial_density=1.0
+# final_density=1.0
+# density_step=0.1
+# DENSITY_LIST=$(LC_NUMERIC=C awk "BEGIN{for(d=$initial_density; d<=$final_density+1e-9; d+=$density_step) printf \"%.2f \", d}")
+
+n_min=0.001     # Minimum density (low density, Wigner crystal)
+n_max=1000.0      # Maximum density (high density)
+NPOINTS=20      # Number of points
+
+
+#0.001000 0.002069 
+# 0.004281 0.008859 
+# 0.018330 0.037927 
+# 0.078476 
+# 0.162378 
+# 0.335982 0.695193 
+# 1.438450 2.976351 
+# 6.158482 12.742750 
+# 26.366509 
+# 54.555948 112.883789 
+# 233.572147 483.293024 
+DENSITY_LIST="
+10000.000000"
+
+# DENSITY_LIST=$(LC_NUMERIC=C awk -v start=$n_min -v end=$n_max -v NPTS=$NPOINTS 'BEGIN{
+#     for(i=0;i<NPTS;i++){
+#         n = start * (end/start)^(i/(NPTS-1));
+#         printf "%.6f ", n
+#     }
+# }')
+# echo "$DENSITY_LIST"
+
+
 
 # Physical / algorithmic parameters
-MELTING=1
-INPUT_POSITIONS_FILE="output_n216/n216_density1.00_t1.0-0.0001-0.98/final_position.xyz"
+MELTING=0
+INPUT_POSITIONS_FILE="PATH"
 FREEZE_MC_STEPS_SCALE=0.5
 ALPHA=0.5
-C0=0.02
+C0=0.003
 CHARGE=1.0
 
 # Pair temperatures: T_INICIAL T_FINAL
 TEMP_PAIRS="
-0.0001 0.05
-0.0001 0.15
-0.0001 0.2
+2.5 0.1
 "
 
-T_STEP=0.0001
+T_STEP=0.98
 
 # Output base directory
 BASE_OUTDIR=output
@@ -47,6 +74,7 @@ mkdir -p "$BASE_OUTDIR"
 # Loop over N, Density and Temperatures
 for N in $N_LIST; do
     for DENSITY in $DENSITY_LIST; do
+        # C0=$(LC_NUMERIC=C awk "BEGIN { print 10 * (1.0 / $DENSITY)^(1/3) }")
         # Temperature loop
         printf "%s\n" "$TEMP_PAIRS" | while read -r T_INITIAL T_FINAL; do
 
