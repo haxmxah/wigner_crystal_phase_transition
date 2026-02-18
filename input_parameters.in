@@ -1,9 +1,12 @@
-125                      ! Number of particles
+1                ! If the program is used as a melting or cooling way
+"output_n216/n216_density1.00_t1.0-0.0001-0.98/final_position.xyz"   ! Initial configuration path
+216                      ! Number of particles
 0.5  ! Freeze MC steps
-0.5                  ! Parameter alpha
-0.10                ! Density
+0.8                  ! Parameter alpha
+0.5                     ! Parameter C0
+1.00                ! Density
 1.0                 ! Particle charge
-1.0              ! Initial temperature
-0.0001                ! Final temperature
-0.99                 ! Temperature step
-8.61774                      ! Box size
+0.0001              ! Initial temperature
+10                ! Final temperature
+0.1                 ! Temperature step
+6                      ! Box size
