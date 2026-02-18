@@ -27,7 +27,8 @@ from matplotlib.ticker import MaxNLocator
 plt.style.use('science.mplstyle')
 plt.rcParams.update({
     "text.usetex": True,
-    "font.family": "STIXGeneral"
+    "font.family": "STIXGeneral",
+    "font.size": 10
 })
 
 
@@ -376,14 +377,14 @@ def get_phase_transition_diagram(output_dir):
                     color='salmon', alpha=0.3)
 
     plt.plot(Tc_vals, rho_theoretical, "--", color='black', lw=1, 
-            label=rf"$\rho = {k:.2f} T_c^3$")
+            label=rf"$n = {k:.2f} T_c^3$")
     plt.plot(df["Tc"], df["density"], "o", markersize=4, 
             label="MC Simulation")
 
-    plt.text(df["Tc"].min() + 0.9, df["density"].min()+0.001, "Gas", 
-            fontsize=12, color='darkgreen')
-    plt.text(df["Tc"].max() - 0.5, df["density"].max() - 800, "Coulomb Crystal", 
-            fontsize=12, color='darkred', horizontalalignment='right')
+    plt.text(df["Tc"].min() + 0.4, df["density"].min()+1E-1, "Liquid/Gas", 
+            fontsize=10, color='darkgreen')
+    plt.text(df["Tc"].max() - 0.5, df["density"].max() - 800, "Wigner-Crystal", 
+            fontsize=10, color='darkred', horizontalalignment='right')
 
     ymin = df["density"].min()
     ymax = df["density"].max()
@@ -392,7 +393,7 @@ def get_phase_transition_diagram(output_dir):
 
     plt.gca().yaxis.set_major_locator(MaxNLocator(nbins=6))
     plt.xlabel("$T_c$")
-    plt.ylabel(r"$\rho$")
+    plt.ylabel(r"$n$")
     plt.legend(frameon=False, loc='upper center', bbox_to_anchor=(0.5, -0.20),
            ncol=2) 
 
