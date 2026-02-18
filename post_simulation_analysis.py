@@ -20,10 +20,6 @@ import warnings
 import kaleido
 from matplotlib.ticker import MaxNLocator
 
-# from plot_style import set_plot_style
-
-# set_plot_style()
-
 plt.style.use('science.mplstyle')
 plt.rcParams.update({
     "text.usetex": True,
@@ -389,7 +385,9 @@ def get_phase_transition_diagram(output_dir):
     ymin = df["density"].min()
     ymax = df["density"].max()
 
-    plt.ylim(ymin, ymax)
+    ax = plt.gca()
+    ax.set_yscale('log')
+    ax.margins(y=0.05)
 
     plt.gca().yaxis.set_major_locator(MaxNLocator(nbins=6))
     plt.xlabel("$T_c$")
